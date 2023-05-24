@@ -3,24 +3,24 @@
     "path": "~/Tec/8o semestre/Tesina/Scripts/tesina/desiertos_alimentarios.R",
     "project_path": "tesina/desiertos_alimentarios.R",
     "type": "r_source",
-    "hash": "0",
+    "hash": "2836411387",
     "contents": "",
-    "dirty": true,
+    "dirty": false,
     "created": 1683946912985.0,
     "source_on_save": false,
     "relative_order": 1,
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "88,0",
-        "scrollLine": "80"
+        "cursorPosition": "199,0",
+        "scrollLine": "193"
     },
     "folds": "",
-    "lastKnownWriteTime": 1684017335,
+    "lastKnownWriteTime": 1684950945,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1684096758987,
+    "last_content_update": 1684950945878,
     "read_only": false,
     "read_only_alternatives": []
 }
