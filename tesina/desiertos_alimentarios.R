@@ -36,13 +36,14 @@ agebs_nl <- left_join(agebs_nl,IMU_2020,by="CVE_AGEB")
 agebs_nl$GM_2020 <- factor(agebs_nl$GM_2020, levels = c("Muy bajo", "Bajo", "Medio", "Alto", "Muy alto"), ordered = TRUE)
 # ENCONTRAR CENTROIDE DE AGEBS
 agebs_nl$centroid <- st_centroid(agebs_nl$geometry)
+# Cambiar tipo de datos de pobtot y tvivhab
+agebs_nl <- agebs_nl %>%
+  mutate(pobtot = as.numeric(pobtot),
+         tvivhab = as.numeric(tvivhab))
 
-# AGEBS MARGINADOS
-agebs_marginados <- agebs_nl %>% filter(GM_2020 %in% c("Medio", "Alto", "Muy alto"))
-agebs_marginados$buffer <- st_buffer(agebs_marginados$geometry, dist = 1000)
 
 
-#####DENUE
+##### DENUE
 datos_denue <- read_sf("Datos/raw/INEGI_DENUE_12052023/INEGI_DENUE_12052023.shp") %>% 
   select(id,clee,nom_estab,raz_social,
          codigo_act,nombre_act,per_ocu,
@@ -52,6 +53,7 @@ datos_denue <- read_sf("Datos/raw/INEGI_DENUE_12052023/INEGI_DENUE_12052023.shp"
 Encoding(datos_denue$nom_estab) <- "latin1"
 Encoding(datos_denue$nombre_act) <- "latin1"
 
+# DEFINIR CUÁLES AGEBS SE CONSIDERAN SALUDABLES
 datos_denue$alimento_convencional <- 1
 
 # OXXOS Y SEVEN ELEVENS
@@ -88,12 +90,8 @@ st_crs(agebs_nl)
 st_crs(datos_denue)
 datos_denue <- st_transform(datos_denue, crs = 4326)
 
-#agebs_trimmed <- as.data.frame(agebs_nl) %>% 
-  select(cve_agee,cve_agem,cve_loc,cvegeo,centroid) %>%
-  rename(geometry.x=centroid) %>%
-  st_as_sf()
 
-#agebs_denue <- st_join(agebs_trimmed, datos_denue, join = st_nearest_feature) 
+
 
 
 # MAPEAR AGEBS POR GRADO DE MARGINACIÓN
@@ -114,7 +112,7 @@ map
  
 #  addLegend("bottomright", pal = ~pal(GM_2020), values = ~GM_2020, title = "Grado de Marginación") %>%
 
-#datos_denue$buffer <- st_buffer(datos_denue$geometry, 1000)
+
 
 map <- leaflet() %>% 
   addProviderTiles("CartoDB.Positron") %>% 
@@ -202,33 +200,22 @@ agebs_marginados <- agebs_nl %>% filter(GM_2020 %in% c("Medio", "Alto", "Muy alt
 dir.create("Datos/processed/agebs_marginados_indice")
 write_sf(agebs_marginados, "Datos/processed/agebs_marginados_indice/agebs_marginados_indice.shp")
 
-agebs_nl$indice_acceso <- 
+agebs_nl <- agebs_nl %>%
+  mutate(indice_acceso = case_when(
+    GM_2020 == "Muy bajo" ~ 5,
+    GM_2020 == "Bajo" ~ 4,
+    GM_2020 == "Medio" ~ 3,
+    GM_2020 == "Alto" ~ 2,
+    GM_2020 == "Muy alto" ~ 1
+  ),indice_acceso = indice_acceso * 0.5,
+  indice_acceso = ifelse(is.na(proporcion_saludable),indice_acceso, indice_acceso + proporcion_saludable))
 
 
 
 
 
 
-agebs_marginados_buffers <- agebs_marginados %>% 
-  as.data.frame() %>%
-  select(CVE_AGEB,buffer) %>%
-  st_as_sf()
 
-agebs_marginados_unidades  <- st_join(agebs_marginados_buffers,datos_denue,join = st_intersects)
-
-agebs_marginados_unidades  <- agebs_marginados_unidades  %>%
-  as.data.frame() %>%
-  select(CVE_AGEB,id,alimento_convencional)
-
-write.csv(agebs_marginados_unidades, "Datos/processed/agebs_marginados_unidades.csv")
-
-marginados_unidades_count <- agebs_marginados_unidades  %>% 
-  group_by(CVE_AGEB) %>%
-  summarise(unidades_totales = n(),
-            unidades_saludables = sum(alimento_convencional)) %>%
-  mutate(proporcion_saludable = round(unidades_saludables / unidades_totales, 2))
-
-table(marginados_unidades_count$proporcion_saludable)
 
 barplot(table(agebs_denue_count$unidades_totales), 
      las =2,
@@ -242,11 +229,8 @@ barplot(table(agebs_denue_count$proporcion_saludable),
         xlab = "Proporción de unidades económicas saludables alrededor del AGEB",
         ylab = "Frecuencia")
 
-agebs_marginados <- agebs_marginados %>%
-  merge(marginados_unidades_count, by = 'CVE_AGEB')
 
-dir.create("Datos/processed/agebs_marginados")
-write_sf(agebs_marginados, "Datos/processed/agebs_marginados/agebs_marginados.shp")
+
 
 pal <- colorNumeric("YlOrRd", agebs_nl$unidades_totales,reverse = TRUE)
 
@@ -256,22 +240,25 @@ map <- leaflet() %>%
               stroke = TRUE, opacity = 1,
               fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
               popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
-                             "<br><strong>Unidades económicas <br>cercanas:</strong>",agebs_nl$unidades_totales))
+                             "<br><strong>Unidades económicas <br>cercanas:</strong>",
+                             agebs_nl$unidades_totales))
 map
 
-pal <- colorNumeric("YlOrRd", agebs_nl$proporcion_saludable,reverse = TRUE)
+pal <- colorNumeric("YlOrRd", agebs_nl$indice_acceso,reverse = TRUE)
 
 map <- leaflet() %>% 
   addProviderTiles("CartoDB.Positron") %>% 
-  addPolygons(data = agebs_nl, fillColor = ~pal(proporcion_saludable),
+  addPolygons(data = agebs_nl, fillColor = ~pal(indice_acceso),
               stroke = TRUE, opacity = 1,
               fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
               popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
                              "<strong>MUN:</strong>",agebs_nl$nom_agem,
-                             "<br><strong>GMU:</strong>",agebs_nl$GM_2020,
+                             "<br><strong>Grado de Marginación:</strong>",agebs_nl$GM_2020,
                              "<br><strong>Unidades económicas <br>cercanas:</strong>",agebs_nl$unidades_totales,
-                             "<br><strong>Opciones saludables <br>cercanas:</strong>",agebs_nl$unidades_saludables,
-                             "<br><strong>Accesibilidad <br>alimento saludable:</strong>",agebs_nl$proporcion_saludable))
+                             "<br><strong>Opciones saludables:</strong>",agebs_nl$unidades_saludables,
+                             "<br><strong>Índice de acceso:</strong>",agebs_nl$indice_acceso)) %>%
+  addLegend(position = "bottomright", pal = pal, values = agebs_nl$indice_acceso, 
+            title = "Acceso a alimento saludable", opacity = 1)
 map
 saveWidget(map, file = "Datos/processed/accesibilidad_alimentaria.html")
 
@@ -294,3 +281,59 @@ map_desiertos
 # NUMERO DE UNIDADES ECONÓMICAS POR HABITANTES
 # ESTRATIFICAR 
 View(agebs_nl[is.na(agebs_nl$cve_agee),])
+
+# Acceso a unidades económicas alimentarias según índice de marginación
+lm_tot_imu <- lm(unidades_totales ~ log(IM_2020), data = agebs_nl)
+plot(log(agebs_nl$IM_2020),agebs_nl$unidades_totales,
+     main = "Acceso a unidades económicas alimentarias\nsegún índice de marginación",
+     xlab = "Índice de marginación",
+     ylab = "Número de unidades cercanas")
+abline(lm_tot_imu)
+
+# Acceso a unidades económicas alimentarias saludables según índice de marginación
+lm_sal_imu <- lm(unidades_saludables ~ IM_2020, data = agebs_nl)
+plot(agebs_nl$IM_2020,agebs_nl$unidades_saludables,
+     main = "Acceso a unidades económicas alimentarias\nsaludables según índice de marginación por AGEB",
+     xlab = "Índice de marginación",
+     ylab = "Número de unidades saludables cercanas")
+abline(lm_sal_imu)
+
+# Proporción de opciones saludables según índice de marginación
+lm_prop_imu <- lm(proporcion_saludable ~ IM_2020, data = agebs_nl)
+plot(agebs_nl$IM_2020,agebs_nl$proporcion_saludable,
+     main = "Acceso a alimentos saludables según\n índice de marginación por AGEB",
+     xlab = "Índice de marginación",
+     ylab = "Proporción de opciones saludables")
+abline(lm_prop_imu)
+
+agebs_nl <- agebs_nl %>%
+  mutate(pobtot = as.numeric(pobtot),
+         tvivhab = as.numeric(tvivhab))
+
+lm_blight <- lm(indice_acceso~pobtot+tvivhab, data = agebs_nl)
+summary(lm_blight)
+
+lm(indice_acceso~tvivhab, data = agebs_nl)
+summary(lm(indice_acceso~tvivhab, data = agebs_nl))
+plot(agebs_nl$tvivhab, agebs_nl$indice_acceso)
+abline(lm(indice_acceso~tvivhab, data = agebs_nl))
+
+lm(indice_acceso~pobtot, data = agebs_nl)
+summary(lm(indice_acceso~pobtot, data = agebs_nl))
+plot(agebs_nl$pobtot, agebs_nl$indice_acceso)
+abline(lm(indice_acceso~pobtot, data = agebs_nl))
+
+summary(lm_tot_imu)
+summary(lm_sal_imu)
+summary(lm_prop_imu)
+
+
+plot(agebs_nl$proporcion_saludable,agebs_nl$tvivhab)
+abline(lm(tvivhab ~ proporcion_saludable, data = agebs_nl))
+plot(agebs_nl$tvivhab,agebs_nl$proporcion_saludable)
+abline(lm(proporcion_saludable ~ tvivhab, data = agebs_nl))
+
+# UNIDADES PER CAPITA INDICE DE MARGINACION
+agebs_nl <- agebs_nl %>%
+  mutate(uni_per_capita = unidades_totales/pobtot)
+# PROPORTION AS DEPENDENT, MARGINALIZATION, (WITH AND WITHOUT) TOTAL STORES, AND TOTAL POP AS INDEPENDENT
