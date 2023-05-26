@@ -1,5 +1,7 @@
 # Ubicación de Desiertos Alimentarios
 
+![map demo](images/demo.mp4)
+
 Este repositorio alberga los archivos utilizados para llevar a cabo la ubicación de los desiertos alimentarios en el estado de Nuevo León. Los desiertos alimentarios son aquellas zonas geográficas con un bajo acceso a alimentos nutritivos, y es una problemática social compuesta por lo menos de dos dimensiones: una geográfica y una socioeconómica. 
 
 
