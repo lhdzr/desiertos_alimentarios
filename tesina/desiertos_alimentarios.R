@@ -10,7 +10,12 @@ city_limits_directory <- "Datos/raw/limites_municipales/"
 ageb_output_dir <- "Datos/raw/agebs"
 
 # LECTURA DATOS CENSALES 2020
-#censo <- read.csv("Datos/raw/ageb_mza_urbana_19_cpv2020_csv/ageb_mza_urbana_19_cpv2020/conjunto_de_datos/conjunto_de_datos_ageb_urbana_19_cpv2020.csv")
+censo <- read.csv("Datos/raw/ageb_mza_urbana_19_cpv2020_csv/ageb_mza_urbana_19_cpv2020/conjunto_de_datos/conjunto_de_datos_ageb_urbana_19_cpv2020.csv") %>%
+  mutate(CVE_AGEB = paste0(ENTIDAD,sprintf("%03d",MUN),sprintf("%04d",LOC),AGEB)) %>%
+  group_by(CVE_AGEB) %>%
+  summarise(POB_IND = sum(as.integer(P3YM_HLI)),
+            HOM_IND = sum(as.integer(P3YM_HLI_M)),
+            MUJ_IND = sum(as.integer(P3YM_HLI_F)))
 
 
 # LECTURA DATOS ÍNDICE DE MARGINACIÓN URBANA
@@ -64,24 +69,18 @@ datos_denue$alimento_convencional[datos_denue$raz_social %in% c("CADENA COMERCIA
                                           "7 ELEVEN MEXICO SA DE CV", 
                                           "SEVEN ELEVEN DE MEXICO")] <- 0
 
-oxxos_sevens <- datos_denue[datos_denue$raz_social %in% c("CADENA COMERCIAL OXXO SA DE CV",
-                                                          "CADENA COMERCIAL OXXO",
-                                                          "CADENA COMERCIAL OXXO SUCURSAL HACIENDADEL ANGEL SA DE CV",
-                                                          "7-ELEVEN MEXICO SA DE CV", 
-                                                          "7 ELEVEN MEXICO SA DE CV", 
-                                                          "SEVEN ELEVEN DE MEXICO"),]
+# oxxos_sevens <- datos_denue[datos_denue$raz_social %in% c("CADENA COMERCIAL OXXO SA DE CV",
+#                                                           "CADENA COMERCIAL OXXO",
+#                                                           "CADENA COMERCIAL OXXO SUCURSAL HACIENDADEL ANGEL SA DE CV",
+#                                                           "7-ELEVEN MEXICO SA DE CV", 
+#                                                           "7 ELEVEN MEXICO SA DE CV", 
+#                                                           "SEVEN ELEVEN DE MEXICO"),]
 
-# DULCERÍAS
-datos_denue$alimento_convencional[datos_denue$codigo_act=="461160"] <- 0 
+# DULCERÍAS, PALETERÍAS, OTROS ALIMENTOS, MISCELÁNEAS
+actividades_no_saludables <- c("461160","461170","461190","461110")
+datos_denue$alimento_convencional[datos_denue$codigo_act %in% actividades_no_saludables] <- 0 
 
-# PALETERÍAS
-datos_denue$alimento_convencional[datos_denue$codigo_act=="461170"] <- 0 
 
-# OTROS ALIMENTOS
-datos_denue$alimento_convencional[datos_denue$codigo_act=="461190"] <- 0 
-
-# MISCELANEAS, TIENDAS DE ABARROTES
-datos_denue$alimento_convencional[datos_denue$codigo_act=="461110"] <- 0
 
 #buffer <- st_buffer(datos_denue$geometry,dist = 1000)
 
@@ -92,8 +91,8 @@ datos_denue <- st_transform(datos_denue, crs = 4326)
 
 
 
-
-
+####################################################################################3
+# VISUALIZAR MARGINACIÓN Y UNIDADES ECONÓMICAS TOTALES
 # MAPEAR AGEBS POR GRADO DE MARGINACIÓN
 pal <- colorFactor("YlOrRd", agebs_nl$GM_2020, ordered = TRUE)
 
@@ -110,30 +109,10 @@ map <- leaflet() %>%
                    popup = as.character(datos_denue$nom_estab)) 
 map
  
-#  addLegend("bottomright", pal = ~pal(GM_2020), values = ~GM_2020, title = "Grado de Marginación") %>%
-
-
-
-map <- leaflet() %>% 
-  addProviderTiles("CartoDB.Positron") %>% 
-  addPolygons(data = agebs_nl, fillColor = ~pal(GM_2020),
-              stroke = TRUE, opacity = 1,
-              fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
-              popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
-                             "<br><strong>GMU:</strong>",agebs_nl$GM_2020,
-                             "<br><strong>Municipio:</strong>",agebs_nl$nom_agem)) %>% 
-  addCircleMarkers(oxxos_sevens$longitud,
-                   oxxos_sevens$latitud, 
-                   clusterOptions = markerClusterOptions(),
-                   popup = as.character(oxxos_sevens$nom_estab))
-
-map
 
 
 # GUARDAR MAPA COMO ARCHIVO HTML
 saveWidget(map, file = "Datos/processed/marginacion_nl.html")
-
-
 
 
 
@@ -145,32 +124,9 @@ agebs_zmm <- makeAGEBMap(19,zmm_codes,.5) %>%
                    popup = as.character(datos_denue$nom_estab))
 agebs_zmm
 
+###############################################################################
 
-
-#### BUFFERS
-#### UNIDADES ECONÓMICAS
-#buffers_denue <- st_buffer(datos_denue$geometry,dist = 1000)
-#write_sf(buffer, "Datos/processed/buffers/buffers_denue/buffers_denue.shp")
-buffers_denue <- read_sf("Datos/processed/buffers/buffers_denue/buffers_denue.shp")
-
-ue_acceso <- datos_denue[datos_denue$alimento_convencional==1,]
-buffers_acceso <- st_buffer(ue_acceso,dist = 1000)
-write_sf(buffers_acceso, "Datos/processed/buffers/buffers_acceso/buffers_acceso.shp")
-buffers_acceso <- read_sf("Datos/processed/buffers/buffers_acceso/buffers_acceso.shp")
-#### AGEBS
-agebs_nl$buffer <- st_buffer(agebs_nl$centroid, dist = 1000)
-#write_sf(buffer_agebs, "Datos/processed/buffers/buffers_agebs/buffers_agebs.shp")
-buffers_agebs <- read_sf("Datos/processed/buffers/buffers_agebs/buffers_agebs.shp")
-
-### INTERSECCION DE CENTROIDES Y BUFFERS
-interseccion <- st_intersects(agebs_nl$centroid,buffers_denue)
-interseccion_acceso <- st_intersects(agebs_nl$centroid,buffers_acceso)
-conteo <- sapply(interseccion,length)
-conteo_acceso <- sapply(interseccion_acceso,length)
-which(conteo==0)
-
-
-#### AGEBS_MARGINADOS 
+# GENERACIÓN DE BUFFER ALREDEDOR DE AGEBS
 agebs_nl$buffer <- st_buffer(agebs_nl$centroid, dist = 1000)
 
 buffers_agebs <- agebs_nl %>%
@@ -178,6 +134,7 @@ buffers_agebs <- agebs_nl %>%
   select(CVE_AGEB,buffer) %>%
   st_as_sf()
 
+# INTERSECCIÓN ENTRE BUFFERS DE AGEBS Y UNIDADES ECONÓMICAS (UEs)
 agebs_denue <- st_join(buffers_agebs,datos_denue,join = st_intersects) %>%
   as.data.frame() %>%
   select(CVE_AGEB,id,alimento_convencional)
@@ -190,16 +147,15 @@ agebs_denue_count <- agebs_denue  %>%
             unidades_saludables = sum(alimento_convencional)) %>%
   mutate(proporcion_saludable = round(unidades_saludables / unidades_totales, 2))
 
+# CONTABILIZACIÓN DE UEs por AGEB
 agebs_nl <- agebs_nl %>%
-  merge(agebs_denue_count, by = 'CVE_AGEB')
+  merge(agebs_denue_count, by = 'CVE_AGEB') %>%
+  merge(censo, by = 'CVE_AGEB',all.x = TRUE)
 
 dir.create("Datos/processed/agebs_nl_indice")
 write_sf(agebs_nl, "Datos/processed/agebs_nl_indice/agebs_nl_indice.shp")
 
-agebs_marginados <- agebs_nl %>% filter(GM_2020 %in% c("Medio", "Alto", "Muy alto"))
-dir.create("Datos/processed/agebs_marginados_indice")
-write_sf(agebs_marginados, "Datos/processed/agebs_marginados_indice/agebs_marginados_indice.shp")
-
+# GENERACIÓN DE INDICE DE ACCESIBILIDAD
 agebs_nl <- agebs_nl %>%
   mutate(indice_acceso = case_when(
     GM_2020 == "Muy bajo" ~ 5,
@@ -210,12 +166,15 @@ agebs_nl <- agebs_nl %>%
   ),indice_acceso = indice_acceso * 0.5,
   indice_acceso = ifelse(is.na(proporcion_saludable),indice_acceso, indice_acceso + proporcion_saludable))
 
+# FILTRO DE AGEBS MARGINADOS
+agebs_marginados <- agebs_nl %>% filter(GM_2020 %in% c("Medio", "Alto", "Muy alto"))
+#dir.create("Datos/processed/agebs_marginados_indice")
+#write_sf(agebs_marginados, "Datos/processed/agebs_marginados_indice/agebs_marginados_indice.shp")
 
 
 
 
-
-
+# VISUALIZACIONES
 
 barplot(table(agebs_denue_count$unidades_totales), 
      las =2,
@@ -232,17 +191,17 @@ barplot(table(agebs_denue_count$proporcion_saludable),
 
 
 
-pal <- colorNumeric("YlOrRd", agebs_nl$unidades_totales,reverse = TRUE)
-
-map <- leaflet() %>% 
-  addProviderTiles("CartoDB.Positron") %>% 
-  addPolygons(data = agebs_nl, fillColor = ~pal(unidades_totales),
-              stroke = TRUE, opacity = 1,
-              fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
-              popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
-                             "<br><strong>Unidades económicas <br>cercanas:</strong>",
-                             agebs_nl$unidades_totales))
-map
+# pal <- colorNumeric("YlOrRd", agebs_nl$unidades_totales,reverse = TRUE)
+# 
+# map <- leaflet() %>% 
+#   addProviderTiles("CartoDB.Positron") %>% 
+#   addPolygons(data = agebs_nl, fillColor = ~pal(unidades_totales),
+#               stroke = TRUE, opacity = 1,
+#               fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
+#               popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
+#                              "<br><strong>Unidades económicas <br>cercanas:</strong>",
+#                              agebs_nl$unidades_totales))
+# map
 
 pal <- colorNumeric("YlOrRd", agebs_nl$indice_acceso,reverse = TRUE)
 
@@ -260,6 +219,25 @@ map <- leaflet() %>%
   addLegend(position = "bottomright", pal = pal, values = agebs_nl$indice_acceso, 
             title = "Acceso a alimento saludable", opacity = 1)
 map
+
+pal <- colorNumeric("YlOrRd", agebs_nl$POB_IND,reverse = TRUE)
+
+map <- leaflet() %>% 
+  addProviderTiles("CartoDB.Positron") %>% 
+  addPolygons(data = agebs_nl, fillColor = ~pal(POB_IND),
+              stroke = TRUE, opacity = 1,
+              fillOpacity = 0.8, color = "#BDBDC3", weight = .1,
+              popup = ~paste("<strong>AGEB:</strong>",agebs_nl$cve_ageb,
+                             "<strong>MUN:</strong>",agebs_nl$nom_agem,
+                             "<br><strong>Grado de Marginación:</strong>",agebs_nl$GM_2020,
+                             "<br><strong>Unidades económicas <br>cercanas:</strong>",agebs_nl$unidades_totales,
+                             "<br><strong>Opciones saludables:</strong>",agebs_nl$unidades_saludables,
+                             "<br><strong>Índice de acceso:</strong>",agebs_nl$indice_acceso,
+                             "<br><strong>Población Indígena:</strong>",agebs_nl$POB_IND)) %>%
+  addLegend(position = "bottomright", pal = pal, values = agebs_nl$POB_IND, 
+            title = "Población Indígena", opacity = 1)
+map
+
 saveWidget(map, file = "Datos/processed/accesibilidad_alimentaria.html")
 
 #test <- agebs_nl %>% filter(!st_intersects(buffers_acceso, sparse = FALSE)) 
@@ -336,4 +314,38 @@ abline(lm(proporcion_saludable ~ tvivhab, data = agebs_nl))
 # UNIDADES PER CAPITA INDICE DE MARGINACION
 agebs_nl <- agebs_nl %>%
   mutate(uni_per_capita = unidades_totales/pobtot)
+agebs_nl$pobtot <- ifelse(agebs_nl$pobtot==0,NA,agebs_nl$pobtot)
+agebs_nl$pobtot[1:10]
+
+lm_upc_imu <- lm(uni_per_capita ~ agebs_nl$IM_2020, data = agebs_nl)
+summary(lm_upc_imu)
+plot(agebs_nl$IM_2020, agebs_nl$uni_per_capita,
+     xlab = "Nivel Socioeconómico",
+     ylab = "Tiendas per cápita")
+abline(lm_upc_imu)
 # PROPORTION AS DEPENDENT, MARGINALIZATION, (WITH AND WITHOUT) TOTAL STORES, AND TOTAL POP AS INDEPENDENT
+lm_prop_ses <- lm(proporcion_saludable ~ IM_2020, data = agebs_nl)
+summary(lm_prop_ses)
+plot(agebs_nl$IM_2020, agebs_nl$proporcion_saludable)
+abline(lm_prop_ses)
+
+lm_prop_tot <- lm(proporcion_saludable ~ unidades_totales, data = agebs_nl)
+summary(lm_prop_tot)
+plot(agebs_nl$unidades_totales,agebs_nl$proporcion_saludable)
+abline(lm_prop_tot)
+
+lm_prop_pob <- lm(proporcion_saludable ~ pobtot, data = agebs_nl)
+summary(lm_prop_pob)
+plot(agebs_nl$pobtot,agebs_nl$proporcion_saludable)
+abline(lm_prop_tot, col="red")
+
+lm_acc_ind <- lm(indice_acceso ~ POB_IND, data = agebs_nl)
+summary(lm_acc_ind)
+plot(agebs_nl$POB_IND, agebs_nl$indice_acceso)
+abline(lm_acc_ind)
+
+# Regresión de acceso sobre cantidad de población indígena
+lm_acc_ind <- lm(proporcion_saludable ~ POB_IND, data = agebs_nl)
+summary(lm_acc_ind)
+plot(agebs_nl$POB_IND, agebs_nl$proporcion_saludable)
+abline(lm_acc_ind)
