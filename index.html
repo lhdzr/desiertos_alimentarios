@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ambientes Alimentarios NL</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+    }
+    
+    #container {
+      display: flex;
+      height: 100%;
+    }
+    
+    #sidepanel {
+      width: 300px;
+      padding: 20px;
+      background-color: #f2f2f2;
+    }
+    
+    #content {
+      flex: 1;
+      padding: 20px;
+    }
+    
+    h1 {
+      font-size: 24px;
+    }
+    
+    p {
+      font-size: 16px;
+    }
+    
+    #qr-code {
+      margin-top: 20px;
+      text-align: center;
+    }
+    
+    #tabs {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 10px;
+      background-color: #eaeaea;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .tab.active {
+      background-color: lightblue;
+    }
+    
+    .map-container {
+      height: 100%;
+      background-color: #eaeaea;
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+  <script>
+    function showMap(mapId) {
+      var maps = document.getElementsByClassName('map-container');
+      for (var i = 0; i < maps.length; i++) {
+        maps[i].classList.add('hidden');
+      }
+      
+      var selectedMap = document.getElementById(mapId);
+      selectedMap.classList.remove('hidden');
+      
+      var tabs = document.getElementsByClassName('tab');
+      for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+      }
+      
+      var selectedTab = document.querySelector('[onclick="showMap(\'' + mapId + '\')"]');
+      selectedTab.classList.add('active');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      showMap('map1');
+    });
+  </script>
+</head>
+<body>
+  <div id="container">
+    <div id="sidepanel">
+      <h1>Ambientes Alimentarios en Nuevo León</h1>
+      <p><strong>Desiertos Alimentarios</strong>:
+    AGEBs marginados (Marginación media, alta, o muy alta) a por lo
+    menos un kilómetro de la tienda saludable más cercana.</p>
+    <p><strong>Pantanos Alimentarios</strong>:
+    AGEBS marginados con una proporción de tiendas no saludables 
+    mayor a las tiendas saludables cerca.</p>
+    <p><strong>Oasis Alimentarios</strong>:
+    AGEBS de alto nivel socioeconómico con una mayor proporción 
+    de tiendas saludables a 1 km a la redonda</p>
+      
+      <div id="qr-code">
+        <!-- Place your QR code image or HTML here -->
+      </div>
+    </div>
+    
+    <div id="content">
+      <div id="tabs">
+        <div class="tab" onclick="showMap('map1')">Accesibilidad Alimentaria</div>
+        <div class="tab" onclick="showMap('map2')">Desiertos Alimentarios</div>
+        <div class="tab" onclick="showMap('map3')">Pantanos Alimentarios</div>
+        <div class="tab" onclick="showMap('map4')">Oasis Alimentarios</div>
+      </div>
+      
+      <div id="map1" class="map-container">
+        <!-- Content for Map 1 -->
+        <iframe src="Datos/processed/accesibilidad_alimentaria.html" width="100%" height="100%"></iframe>
+      </div>
+      
+      <div id="map2" class="map-container hidden">
+        <!-- Content for Map 2 -->
+        <iframe src="Datos/processed/map_desiertos.html" width="100%" height="100%"></iframe>
+      </div>
+      
+      <div id="map3" class="map-container hidden">
+        <!-- Content for Map 3 -->
+        <iframe src="Datos/processed/map_pantanos.html" width="100%" height="100%"></iframe>
+      </div>
+      
+      <div id="map4" class="map-container hidden">
+        <!-- Content for Map 4 -->
+        <iframe src="Datos/processed/map_oasis.html" width="100%" height="100%"></iframe>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
